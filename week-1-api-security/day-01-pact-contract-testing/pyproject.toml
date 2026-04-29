@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "day-01-pact-contract-testing"
+version = "1.0.0"
+description = "Pact contract testing suite for microservice API versioning"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pact-python = "^2.2"
+fastapi = "^0.110"
+uvicorn = {extras = ["standard"], version = "^0.27"}
+httpx = "^0.27"
+pydantic = "^2.6"
+
+[tool.poetry.dev-dependencies]
+pytest = "^8.1"
+pytest-asyncio = "^0.23"
+pytest-cov = "^5.0"
+
+[tool.pytest.ini_options]
+testpaths = ["consumer/tests", "provider/tests"]
+asyncio_mode = "auto"
+log_cli = true
+log_cli_level = "INFO"
+
+[tool.coverage.run]
+source = ["consumer", "provider"]
+omit = ["*/tests/*"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: pact
+      POSTGRES_PASSWORD: pact
+      POSTGRES_DB: pact
+    volumes:
+      - pact_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pact"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pact-broker:
+    image: pactfoundation/pact-broker:latest
+    ports:
+      - "9292:9292"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PACT_BROKER_DATABASE_ADAPTER: postgres
+      PACT_BROKER_DATABASE_HOST: postgres
+      PACT_BROKER_DATABASE_NAME: pact
+      PACT_BROKER_DATABASE_USERNAME: pact
+      PACT_BROKER_DATABASE_PASSWORD: pact
+      PACT_BROKER_ALLOW_PUBLIC_READ: "true"
+      PACT_BROKER_LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9292/diagnostic/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Optional: user-service provider (for local full-stack runs)
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.provider
+    ports:
+      - "8000:8000"
+    profiles:
+      - full-stack
+
+volumes:
+  pact_postgres_data:
