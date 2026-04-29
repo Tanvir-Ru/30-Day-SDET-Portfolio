@@ -1,0 +1,1 @@
+A structured, project-driven portfolio demonstrating mastery across API security testing, advanced UI automation, DevOps/CI infrastructure, and performance engineering built to meet the bar at top-tier tech companies.
