@@ -1,0 +1,207 @@
+# Regression fixtures — Users API
+# Format: test cases with expected assertions
+# Tags: smoke (core), regression (full suite), auth (requires token)
+
+tests:
+
+  # ── Smoke tests ────────────────────────────────────────────────────────────
+  - id: GET_users_200
+    name: List users returns 200 with pagination
+    method: GET
+    path: /api/users
+    query:
+      page: 1
+      per_page: 20
+    tags: [smoke, regression]
+    expected:
+      status: 200
+      max_ms: 500
+      schema:
+        type: object
+        required: [users, total, page, per_page]
+        properties:
+          users:
+            type: array
+            items:
+              type: object
+              required: [id, name, email]
+              properties:
+                id:    { type: integer }
+                name:  { type: string, minLength: 1 }
+                email: { type: string }
+          total:    { type: integer, minimum: 0 }
+          page:     { type: integer, minimum: 1 }
+          per_page: { type: integer, minimum: 1 }
+      fields:
+        page: 1
+        per_page: 20
+
+  - id: GET_user_by_id_200
+    name: Get user by ID returns correct user
+    method: GET
+    path: /api/users/{user_id}
+    path_params:
+      user_id: 1
+    tags: [smoke, regression]
+    expected:
+      status: 200
+      max_ms: 300
+      schema:
+        type: object
+        required: [id, name, email]
+        properties:
+          id:    { type: integer }
+          name:  { type: string }
+          email: { type: string }
+      fields:
+        id: 1
+
+  - id: GET_user_not_found_404
+    name: Get non-existent user returns 404
+    method: GET
+    path: /api/users/{user_id}
+    path_params:
+      user_id: 999999
+    tags: [smoke, regression]
+    expected:
+      status: 404
+      schema:
+        type: object
+        required: [error]
+        properties:
+          error: { type: string }
+
+  # ── Create user ────────────────────────────────────────────────────────────
+  - id: POST_user_201
+    name: Create user returns 201 with created resource
+    method: POST
+    path: /api/users
+    body:
+      name: "Regression Test User"
+      email: "regression@test.com"
+      role: "user"
+    tags: [regression]
+    expected:
+      status: 201
+      max_ms: 800
+      schema:
+        type: object
+        required: [id, name, email]
+      contains:
+        - "Regression Test User"
+        - "regression@test.com"
+      not_contains:
+        - "password"
+        - "secret"
+
+  - id: POST_user_422_missing_email
+    name: Create user with missing email returns 422
+    method: POST
+    path: /api/users
+    body:
+      name: "No Email User"
+    tags: [regression]
+    expected:
+      status: 422
+
+  - id: POST_user_422_invalid_email
+    name: Create user with invalid email returns 422
+    method: POST
+    path: /api/users
+    body:
+      name: "Bad Email User"
+      email: "not-an-email"
+    tags: [regression]
+    expected:
+      status: 422
+
+  # ── Security assertions ────────────────────────────────────────────────────
+  - id: GET_users_no_passwords
+    name: User list must not expose password fields
+    method: GET
+    path: /api/users
+    tags: [smoke, regression, security]
+    expected:
+      status: 200
+      not_contains:
+        - '"password"'
+        - '"secret"'
+        - '"api_key"'
+        - '"token"'
+
+  - id: GET_user_no_passwords
+    name: User detail must not expose password fields
+    method: GET
+    path: /api/users/{user_id}
+    path_params:
+      user_id: 1
+    tags: [smoke, regression, security]
+    expected:
+      status: 200
+      not_contains:
+        - '"password"'
+        - '"hash"'
+
+  # ── Search ────────────────────────────────────────────────────────────────
+  - id: POST_search_200
+    name: Search returns results matching query
+    method: POST
+    path: /search
+    body:
+      query: "alice"
+      page: 1
+      per_page: 10
+    tags: [regression]
+    expected:
+      status: 200
+      max_ms: 500
+      schema:
+        type: object
+        required: [results, count]
+        properties:
+          results: { type: array }
+          count:   { type: integer, minimum: 0 }
+
+  - id: POST_search_empty_query_422
+    name: Search with empty query returns 422
+    method: POST
+    path: /search
+    body:
+      query: ""
+    tags: [regression]
+    expected:
+      status: 422
+
+  # ── Performance gates ──────────────────────────────────────────────────────
+  - id: PERF_users_list_latency
+    name: User list must respond within SLA
+    method: GET
+    path: /api/users
+    tags: [smoke, performance]
+    expected:
+      status: 200
+      max_ms: 200    # 200ms SLA gate
+
+  - id: PERF_user_detail_latency
+    name: User detail must respond within SLA
+    method: GET
+    path: /api/users/{user_id}
+    path_params:
+      user_id: 1
+    tags: [smoke, performance]
+    expected:
+      status: 200
+      max_ms: 150    # 150ms SLA gate
+
+  # ── Skipped example ────────────────────────────────────────────────────────
+  - id: DELETE_user_204
+    name: Delete user returns 204
+    method: DELETE
+    path: /api/users/{user_id}
+    path_params:
+      user_id: 999
+    tags: [regression]
+    skip: true
+    skip_reason: "Destructive test — enable only in isolated environments"
+    expected:
+      status: 204
