@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  # Real API under test
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Toxiproxy — sits between tests and the API
+  # Management API: localhost:8474
+  # Proxy ports:    localhost:18000-18010 → api:8000
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:latest
+    ports:
+      - "8474:8474"       # Management API
+      - "18000:18000"     # Proxy port (latency tests)
+      - "18001:18001"     # Proxy port (timeout tests)
+      - "18002:18002"     # Proxy port (packet loss tests)
+      - "18003:18003"     # Proxy port (bandwidth tests)
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8474/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Test runner — runs after both services are healthy
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.tests
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+    environment:
+      TARGET_URL:   http://api:8000
+      TOXI_HOST:    toxiproxy
+      TOXI_PORT:    "8474"
+    command: >
+      python -m chaos.engine
+        --target http://api:8000
+        --toxi-host toxiproxy
+        --output json
+        --out-file /results/chaos-report
+    volumes:
+      - ./results:/results
